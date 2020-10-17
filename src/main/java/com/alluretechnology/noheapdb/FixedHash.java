@@ -17,6 +17,7 @@ public class FixedHash implements HashBase {
         IN_MEMORY,
         PERSISTED
     }
+    
 	
     protected static final Logger logger = Logger.getLogger("NIOPersistence");
     protected boolean debugLogging = false;
