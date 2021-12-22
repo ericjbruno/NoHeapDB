@@ -24,13 +24,13 @@ public class NoHeapDB {
         this.homeDirectory = homeDirectory;
     }
 	
-	public boolean createStore( String name ) throws Exception {
+    public boolean createStore( String name ) throws Exception {
         return createStore(name, 
                             DataStore.Storage.IN_MEMORY, 
                             100);
     }
     
-	public boolean createStore( String name, 
+    public boolean createStore( String name, 
                                 DataStore.Storage storageType ) 
                                     throws Exception {
         return createStore( name, 
@@ -38,12 +38,12 @@ public class NoHeapDB {
                             100);
     }
 
-	public boolean createStore( String name, 
+    public boolean createStore( String name, 
                                 DataStore.Storage storageType,
-                                int size ) throws Exception {
-        if ( size > Integer.MAX_VALUE ) {
-            throw new Exception("Database size exceeds " + Integer.MAX_VALUE );
-        }
+                                long size ) throws Exception {
+//        if ( size > Integer.MAX_VALUE ) {
+//            throw new Exception("Database size exceeds " + Integer.MAX_VALUE );
+//        }
         
         NoHeapDBStore nohdb = new 
             NoHeapDBStore( homeDirectory, "joh-" + name + "-", 

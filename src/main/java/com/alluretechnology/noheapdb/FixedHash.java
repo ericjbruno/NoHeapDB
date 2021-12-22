@@ -17,8 +17,7 @@ public class FixedHash implements HashBase {
         IN_MEMORY,
         PERSISTED
     }
-    
-	
+
     protected static final Logger logger = Logger.getLogger("NIOPersistence");
     protected boolean debugLogging = false;
 
@@ -26,7 +25,7 @@ public class FixedHash implements HashBase {
     protected static final int PAGE_SIZE = 1024 * 1024; 
     protected static final int SIZE_FACTOR = 100;
     protected static final int DEFAULT_INDEX_JOURNAL_SIZE = SIZE_FACTOR * PAGE_SIZE; 
-	protected static final int KEY_SIZE = 0;
+    protected static final int KEY_SIZE = 0;
     
     // 
     // 1 (byte)  key length
@@ -212,8 +211,11 @@ public class FixedHash implements HashBase {
                         fixedKeyBytes = new byte[KEY_SIZE];
                         oldBuffer.get(fixedKeyBytes);
                     }
-                    Long location = oldBuffer.getLong();
-                    putInternal(fixedKeyBytes, keyHash, occupied, location);
+                    long location = oldBuffer.getLong();
+                    long offset = (int)(location >> 32);
+                    int segment = (int)location;
+
+                    putInternal(fixedKeyBytes, keyHash, occupied, segment, offset);
                 }
                 else {
                     // Bucket unocuppied, move to the next one
@@ -266,13 +268,14 @@ public class FixedHash implements HashBase {
         if ( ! found && mustFind ) {
             return -1;
         }
+        
         return offset;
     }
 
     protected boolean putInternal(  byte[] fixedKeyBytes, Integer hashcode, 
-                                    byte keyLength, Long value) {
-        int offset = getHashBucket(hashcode);
-        indexBuffer.position(offset);
+                                    byte keyLength, Integer segment, Long offset) {
+        int bucket = getHashBucket(hashcode);
+        indexBuffer.position(bucket);
         indexBuffer.mark();
         byte occupied = indexBuffer.get();
         if ( occupied == 0 ) {
@@ -284,10 +287,10 @@ public class FixedHash implements HashBase {
 
             // When there's a collision, walk the table until a 
             // free slot is found
-            offset = findBucket(hashcode, offset, false);
+            bucket = findBucket(hashcode, bucket, false);
 
             // found a free slot, seek to it
-            indexBuffer.position(offset);
+            indexBuffer.position(bucket);
         }
 
         // Write the data
@@ -299,7 +302,9 @@ public class FixedHash implements HashBase {
             indexBuffer.put(fixedKeyBytes, 
                             0, Math.min(KEY_SIZE, fixedKeyBytes.length) );
         }
-        indexBuffer.putLong( value ); // indexed record location
+        
+        long value = (((long)offset) << 32) | (segment & 0xffffffffL);
+        indexBuffer.putLong( value ); // indexed record location (segment and offset)
         
         bucketsUsed++;
 
@@ -307,7 +312,7 @@ public class FixedHash implements HashBase {
     }
     
     @Override
-    public boolean put(String key, Long value) {
+    public boolean put(String key, Integer segment, Long offset) {
         // 
         // Entry:
         // 1 (byte)  key length
@@ -331,14 +336,15 @@ public class FixedHash implements HashBase {
                                 0, Math.min(KEY_SIZE, keylen) );
             }
 
-            return putInternal(fixedKeyBytes, key.hashCode(), keylen, value);
+            return putInternal( fixedKeyBytes, key.hashCode(), 
+                                keylen, segment, offset);
         }
         catch ( Exception e ) {
             e.printStackTrace();
         }
         
         return false;
-	}
+    }
 
     protected int getHashBucketOffset(String key) {
         int offset = -1;
@@ -360,15 +366,15 @@ public class FixedHash implements HashBase {
     
     @Override
     public Long get(String key) {
-        int offset = getHashBucketOffset(key);
-		if ( offset == -1 ) {
+        int bucket = getHashBucketOffset(key);
+        if ( bucket == -1 ) {
             // key not found
-			return -1L;
-		}
+            return -1L;
+        }
 
         // Return the location of the data record
-		return indexBuffer.getLong();
-	}
+        return indexBuffer.getLong();
+    }
 
     @Override
     public void remove( String key ) {
